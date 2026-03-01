@@ -22,7 +22,7 @@ module adder8_tb;
   integer i;
   integer seed;
   integer nrand;
-  integer bit;
+  integer k;      // renamed from "bit" (SV keyword under -g2012)
   integer idx;
 
   reg  [7:0] exp_sum;
@@ -45,9 +45,9 @@ module adder8_tb;
     reg c;
     begin
       c = tcin;
-      for (bit = 0; bit < 8; bit = bit + 1) begin
-        exp_sum[bit] = ta[bit] ^ tb[bit] ^ c;
-        c = (ta[bit] & tb[bit]) | (ta[bit] & c) | (tb[bit] & c);
+      for (k = 0; k < 8; k = k + 1) begin
+        exp_sum[k] = ta[k] ^ tb[k] ^ c;
+        c = (ta[k] & tb[k]) | (ta[k] & c) | (tb[k] & c);
       end
       exp_cout = c;
     end
@@ -118,34 +118,31 @@ module adder8_tb;
     end
 
     // ------------------------------------------------------------
-    // 2) Directed carry-chain torture (very sensitive to wiring mistakes)
+    // 2) Directed carry-chain torture
     // ------------------------------------------------------------
     apply_and_check_strict(8'h00, 8'h00, 1'b0);
     apply_and_check_strict(8'h00, 8'h00, 1'b1);
     apply_and_check_strict(8'hFF, 8'h00, 1'b0);
     apply_and_check_strict(8'hFF, 8'h00, 1'b1);
     apply_and_check_strict(8'hFF, 8'h01, 1'b0);
-    apply_and_check_strict(8'h7F, 8'h01, 1'b0); // ripple across bits 0..6
-    apply_and_check_strict(8'h80, 8'h80, 1'b0); // MSB carry
+    apply_and_check_strict(8'h7F, 8'h01, 1'b0);
+    apply_and_check_strict(8'h80, 8'h80, 1'b0);
     apply_and_check_strict(8'h55, 8'hAA, 1'b0);
     apply_and_check_strict(8'hAA, 8'h55, 1'b1);
 
-    // Toggle-only-cin sensitivity (catches missing cin in sensitivity list)
+    // Toggle-only-cin sensitivity
     a = 8'h3C; b = 8'hA7; cin = 1'b0;
     apply_and_check_strict(8'h3C, 8'hA7, 1'b0);
     apply_and_check_strict(8'h3C, 8'hA7, 1'b1);
 
     // ------------------------------------------------------------
-    // 3) Random stress with X/Z injection (harder than your previous xprop-only rule)
-    //    This uses the ripple reference model for X/Z too.
+    // 3) Random stress with X/Z injection
     // ------------------------------------------------------------
     for (i = 0; i < nrand; i = i + 1) begin
-      // LCG for reproducibility
       seed = seed * 1103515245 + 12345; a   = seed[7:0];
       seed = seed * 1103515245 + 12345; b   = seed[7:0];
       seed = seed * 1103515245 + 12345; cin = seed[0];
 
-      // Occasionally inject X/Z on random bits (makes it much stricter)
       if ((i % 211) == 0) begin
         idx = ($random & 7);
         a[idx] = 1'bx;
@@ -159,7 +156,7 @@ module adder8_tb;
       apply_and_check_strict(a, b, cin);
     end
 
-    // Keep "passed!" unchanged (plus a final line to keep parsers happy)
+    // Keep "passed!" unchanged
     if (errors == 0) $display("passed!");
     else             $display("failed! errors=%0d", errors);
     $display("done");
