@@ -1,12 +1,7 @@
 `timescale 1ns/1ps
 
-// Binary-strict testbench for full_adder, optional X/Z checking.
-// Default: DO_XZ=0 (skip checks when any input is X/Z)
-// Enable X/Z checking: run vvp with +DO_XZ=1
-//
-// Expected DUT:
-// module full_adder(input wire a, input wire b, input wire cin,
-//                   output wire sum, output wire cout);
+// Verilog-2001 compatible testbench for full_adder
+// Prints "passed!" on success.
 
 module full_adder_tb;
 
@@ -16,10 +11,12 @@ module full_adder_tb;
   integer errors;
   integer i;
   integer DO_XZ;
+  integer tmp;
 
-  reg exp_sum, exp_cout;
   reg [1:0] exp2;
+  reg exp_sum, exp_cout;
 
+  // DUT
   full_adder dut (
     .a(a),
     .b(b),
@@ -28,27 +25,27 @@ module full_adder_tb;
     .cout(cout)
   );
 
-  function automatic bit is01(input reg v);
+  function is01;
+    input v;
     begin
       is01 = (v === 1'b0) || (v === 1'b1);
     end
   endfunction
 
   task apply_and_check;
-    input reg ta;
-    input reg tb;
-    input reg tcin;
+    input ta;
+    input tb;
+    input tcin;
     begin
       a   = ta;
       b   = tb;
       cin = tcin;
       #1;
 
-      // If DO_XZ==0, only score when inputs are known 0/1
-      if (!DO_XZ && !(is01(a) && is01(b) && is01(cin))) begin
+      // If DO_XZ==0, only score checks when inputs are 0/1
+      if ((DO_XZ == 0) && !(is01(a) && is01(b) && is01(cin))) begin
         // skip
       end else begin
-        // Binary-golden reference (also works fine for X/Z in DO_XZ mode: will go X if unknown)
         exp2     = {1'b0, a} + {1'b0, b} + {1'b0, cin};
         exp_sum  = exp2[0];
         exp_cout = exp2[1];
@@ -65,7 +62,6 @@ module full_adder_tb;
         end
       end
 
-      // Separate vectors cleanly in time (prevents same-timestep overlap in wave dumps)
       #1;
     end
   endtask
@@ -73,7 +69,7 @@ module full_adder_tb;
   initial begin
     errors = 0;
     DO_XZ  = 0;
-    void'($value$plusargs("DO_XZ=%d", DO_XZ));
+    tmp = $value$plusargs("DO_XZ=%d", DO_XZ); // optional: vvp a.out +DO_XZ=1
 
     $dumpfile("full_adder_tb.vcd");
     $dumpvars(0, full_adder_tb);
@@ -82,7 +78,7 @@ module full_adder_tb;
     for (i = 0; i < 8; i = i + 1)
       apply_and_check(i[2], i[1], i[0]);
 
-    // 2) Optional X/Z vectors (only meaningful if +DO_XZ=1)
+    // 2) Optional X/Z vectors (only scored if +DO_XZ=1)
     apply_and_check(1'bx, 1'b0, 1'b0);
     apply_and_check(1'b0, 1'bx, 1'b0);
     apply_and_check(1'b0, 1'b0, 1'bx);
@@ -91,7 +87,7 @@ module full_adder_tb;
     apply_and_check(1'bx, 1'bx, 1'bx);
     apply_and_check(1'bz, 1'bz, 1'bz);
 
-    // 3) Random binary stress (strict, no X/Z injection)
+    // 3) Random binary stress (always scored)
     repeat (5000) begin
       a   = $random; a   = a   & 1'b1;
       b   = $random; b   = b   & 1'b1;
