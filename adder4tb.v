@@ -12,17 +12,18 @@
 
 module adder4_tb;
 
-  reg  [3:0] a, b;
+  reg  [3:0] a;
+  reg  [3:0] b;
   reg        cin;
   wire [3:0] sum;
   wire       cout;
 
   integer errors;
-  integer i;
+  integer i, j, k;
   integer seed;
   integer nrand;
 
-  reg  [4:0] exp;      // {cout,sum}
+  reg  [4:0] exp;
   reg  [3:0] exp_sum;
   reg        exp_cout;
 
@@ -51,20 +52,17 @@ module adder4_tb;
 
       if (sum !== exp_sum) begin
         errors = errors + 1;
-        $display("[%0t] ERROR(sum): a=%h b=%h cin=%b | sum=%h exp=%h",
-                 $time, a, b, cin, sum, exp_sum);
+        $display("[%0t] ERROR: a=%b b=%b cin=%b | sum=%b (exp %b) cout=%b (exp %b)",
+                 $time, a, b, cin, sum, exp_sum, cout, exp_cout);
       end
       if (cout !== exp_cout) begin
         errors = errors + 1;
-        $display("[%0t] ERROR(cout): a=%h b=%h cin=%b | cout=%b exp=%b",
-                 $time, a, b, cin, cout, exp_cout);
+        $display("[%0t] ERROR: a=%b b=%b cin=%b | sum=%b (exp %b) cout=%b (exp %b)",
+                 $time, a, b, cin, sum, exp_sum, cout, exp_cout);
       end
     end
   endtask
 
-  // Strict X/Z tests:
-  // We DON'T attempt to define arithmetic truth for X/Z; we require that if any input bit is X/Z,
-  // the DUT must not produce a clean 0/1-only result for BOTH sum and cout (i.e., some unknown should propagate).
   task apply_and_check_xprop;
     input [3:0] ta;
     input [3:0] tb;
@@ -75,15 +73,11 @@ module adder4_tb;
       cin = tcin;
       #1;
 
-      // "Strict" propagation check: if any X/Z in inputs, output should contain some X/Z.
-      if ( (^ta === 1'bx) || (^tb === 1'bx) || (tcin === 1'bx) || (tcin === 1'bz) ) begin
-        if ( (sum === 4'b0000 || sum === 4'b0001 || sum === 4'b0010 || sum === 4'b0011 ||
-              sum === 4'b0100 || sum === 4'b0101 || sum === 4'b0110 || sum === 4'b0111 ||
-              sum === 4'b1000 || sum === 4'b1001 || sum === 4'b1010 || sum === 4'b1011 ||
-              sum === 4'b1100 || sum === 4'b1101 || sum === 4'b1110 || sum === 4'b1111 ) &&
-             (cout === 1'b0 || cout === 1'b1) ) begin
+      // Expect at least one unknown in outputs if any input has X/Z
+      if ( (^ta === 1'bx) || (^tb === 1'bx) || !(tcin === 1'b0 || tcin === 1'b1) ) begin
+        if ( (cout === 1'b0 || cout === 1'b1) && (^sum !== 1'bx) ) begin
           errors = errors + 1;
-          $display("[%0t] ERROR(XPROP): a=%b b=%b cin=%b | sum=%b cout=%b (expected some X/Z)",
+          $display("[%0t] ERROR(XPROP): a=%b b=%b cin=%b | sum=%b cout=%b",
                    $time, a, b, cin, sum, cout);
         end
       end
@@ -94,7 +88,7 @@ module adder4_tb;
     errors = 0;
 
     // Optional knobs: +SEED=1234 +NRAND=20000
-    seed  = 32'hA44D3R04;
+    seed  = 32'hA44D3A04;  // FIXED: valid hex literal
     nrand = 20000;
     if ($value$plusargs("SEED=%d", seed))   $display("Using SEED=%0d", seed);
     if ($value$plusargs("NRAND=%d", nrand)) $display("Using NRAND=%0d", nrand);
@@ -103,18 +97,22 @@ module adder4_tb;
     $dumpvars(0, adder4_tb);
 
     // 1) Exhaustive binary: 16*16*2 = 512 vectors
-    for (i = 0; i < 512; i = i + 1) begin
-      apply_and_check_bin(i[8:5], i[4:1], i[0]);
+    for (i = 0; i < 16; i = i + 1) begin
+      for (j = 0; j < 16; j = j + 1) begin
+        for (k = 0; k < 2; k = k + 1) begin
+          apply_and_check_bin(i[3:0], j[3:0], k[0]);
+        end
+      end
     end
 
-    // 2) Corner cases
+    // 2) Some corner cases
     apply_and_check_bin(4'h0, 4'h0, 1'b0);
     apply_and_check_bin(4'hF, 4'h0, 1'b0);
     apply_and_check_bin(4'hF, 4'h1, 1'b0);
     apply_and_check_bin(4'hF, 4'hF, 1'b0);
     apply_and_check_bin(4'hF, 4'hF, 1'b1);
 
-    // 3) X/Z propagation checks (strict-ish)
+    // 3) X/Z propagation checks
     apply_and_check_xprop(4'bxxxx, 4'h0, 1'b0);
     apply_and_check_xprop(4'h0, 4'bzzzz, 1'b0);
     apply_and_check_xprop(4'hA, 4'h5, 1'bx);
