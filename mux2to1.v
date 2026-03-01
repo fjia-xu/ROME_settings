@@ -123,13 +123,12 @@ module mux2to1tb;
     end
 
     // ---- Summary ----
-    if (errors == 0) begin
-      $display("PASS: mux2to1tb finished with 0 errors.");
-    end else begin
-      $display("FAIL: mux2to1tb finished with %0d errors.", errors);
-    end
+    if (errors == 0) $display("passed!");
+    else             $display("failed! errors=%0d", errors);
 
     $finish;
+
   end
 
 endmodule
+
